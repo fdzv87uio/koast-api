@@ -1,13 +1,12 @@
-/* eslint-disable @typescript-eslint/no-unsafe-argument */
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
+import { Campaign, CampaignDocument } from './schemas/campaign.schema';
 import { HttpService } from '@nestjs/axios';
 import { ConfigService } from '@nestjs/config';
 import { Cron, CronExpression } from '@nestjs/schedule';
-import { lastValueFrom } from 'rxjs';
-import { Campaign, CampaignDocument } from './schemas/campaign.schema';
 import { CampaignGateway } from './campaign.gateway';
+import { lastValueFrom } from 'rxjs';
 
 @Injectable()
 export class CampaignService {
@@ -23,14 +22,18 @@ export class CampaignService {
     private readonly campaignGateway: CampaignGateway,
   ) {
     this.FACEBOOK_GRAPH_API_URL = this.configService.get<string>('FACEBOOK_API_URL') ?? "";
-    this.BEARER_TOKEN = this.configService.get<string>('FACEBOOK_BEARER_TOKEN')?? "";
+    this.BEARER_TOKEN = this.configService.get<string>('FACEBOOK_BEARER_TOKEN') ?? "";
   }
 
   // Cron job to fetch data every 30 seconds
   @Cron(CronExpression.EVERY_30_SECONDS)
   async handleCron() {
     this.logger.debug('Attempting to fetch and save campaign data...');
+    // Emit loading event before starting the fetch
+    this.campaignGateway.server.emit('loading', true);
     await this.fetchAndSaveCampaignData();
+    // Emit loadingComplete event after the process
+    this.campaignGateway.server.emit('loadingComplete', false);
   }
 
   /**
